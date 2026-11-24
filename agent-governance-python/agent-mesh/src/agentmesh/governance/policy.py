@@ -599,7 +599,7 @@ class Policy(BaseModel):
         parent_deny_names = {r.name for r in parent_rules if r.action == "deny"}
         child_rules_filtered = []
         for rule in policy.rules:
-            if rule.name in parent_deny_names and rule.action in ("allow", "log"):
+            if rule.name in parent_deny_names and rule.action in ("allow", "warn", "log"):
                 logger.warning(
                     "Policy '%s' rule '%s' attempts to weaken parent deny — ignored",
                     policy.name,
@@ -1179,8 +1179,10 @@ class PolicyEngine:
                     # the window so the (N+1)th matching call trips the limit.
                     self._increment_rate_limit(matched_rule, limit_key)
 
+                # A matched warn/log rule records the match but does not
+                # block, the same as the TypeScript and .NET engines.
                 return PolicyDecision(
-                    allowed=(winner.action == "allow"),
+                    allowed=(winner.action in ("allow", "warn", "log")),
                     action=winner.action,
                     matched_rule=winner.rule_name,
                     policy_name=winner.policy_name,

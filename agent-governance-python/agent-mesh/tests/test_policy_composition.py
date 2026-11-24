@@ -70,6 +70,19 @@ rules:
     priority: 200
 """)
 
+    # Policy that tries to weaken a parent deny with a warn rule
+    (tmp_path / "warn-child.yaml").write_text("""
+apiVersion: governance.toolkit/v1
+name: warn-child
+extends: org-baseline.yaml
+default_action: deny
+rules:
+  - name: block-pii-export
+    condition: "action.type == 'export'"
+    action: warn
+    priority: 200
+""")
+
     # Circular reference A -> B -> A
     (tmp_path / "cycle-a.yaml").write_text("""
 apiVersion: governance.toolkit/v1
@@ -212,6 +225,13 @@ class TestPolicyComposition:
         assert "block-pii-export" in rule_names
         # The child's allow override should be filtered out
         deny_rules = [r for r in policy.rules if r.name == "block-pii-export"]
+        assert all(r.action == "deny" for r in deny_rules)
+
+    def test_child_cannot_weaken_parent_deny_with_warn(self, policy_dir):
+        """A matched warn rule allows, so it cannot override a parent deny either."""
+        policy = Policy.from_yaml_file(str(policy_dir / "warn-child.yaml"))
+        deny_rules = [r for r in policy.rules if r.name == "block-pii-export"]
+        assert deny_rules
         assert all(r.action == "deny" for r in deny_rules)
 
     def test_circular_reference_rejected(self, policy_dir):

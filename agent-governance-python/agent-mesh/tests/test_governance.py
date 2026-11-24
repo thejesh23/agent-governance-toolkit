@@ -107,6 +107,40 @@ class TestPolicyEngine:
         
         assert all(r.action == results[0].action for r in results)
 
+    @pytest.mark.parametrize(
+        "rule_action, expected_allowed",
+        [
+            ("allow", True),
+            ("warn", True),
+            ("log", True),
+            ("deny", False),
+            ("require_approval", False),
+        ],
+    )
+    def test_matched_rule_allowed_flag(self, rule_action, expected_allowed):
+        """A matched warn/log rule is allowed, matching the TS and .NET SDKs."""
+        engine = PolicyEngine()
+        engine.load_policy(
+            Policy(
+                name="Test Policy",
+                agents=["*"],
+                rules=[
+                    PolicyRule(
+                        name="observe-reads",
+                        condition="action.type == 'read'",
+                        action=rule_action,
+                    ),
+                ],
+                default_action="deny",
+            )
+        )
+
+        result = engine.evaluate("did:agentmesh:test", {"action": {"type": "read"}})
+
+        assert result.matched_rule == "observe-reads"
+        assert result.action == rule_action
+        assert result.allowed is expected_allowed
+
 
 class TestCompliance:
     """Tests for ComplianceEngine."""

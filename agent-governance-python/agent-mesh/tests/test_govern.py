@@ -213,6 +213,12 @@ rules:
         with pytest.raises(GovernanceDenied):
             safe(action={"type": "export", "target": "s3"})
 
+    def test_govern_warn_rule_executes(self):
+        """A matched warn rule lets the call through instead of denying it."""
+        safe = govern(dummy_tool, policy=MIXED_POLICY)
+        result = safe(action="write", data={"size_mb": 500})
+        assert result["status"] == "executed"
+
     def test_govern_multiple_calls(self):
         """Governed function can be called multiple times."""
         safe = govern(dummy_tool, policy=ALLOW_ALL_POLICY)
