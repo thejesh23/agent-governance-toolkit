@@ -249,6 +249,26 @@ class TestRateLimitMiddleware:
         assert HEADER_RETRY_AFTER in resp.headers
         assert float(resp.headers[HEADER_RETRY_AFTER]) > 0
 
+    @pytest.mark.parametrize("per_agent_rate", [0.7, 1, 3])
+    def test_retry_after_header_is_whole_seconds(self, per_agent_rate) -> None:
+        """Retry-After is an integer number of seconds (RFC 9110), rounded up."""
+        limiter = RateLimiter(
+            global_rate=1000,
+            global_capacity=2000,
+            per_agent_rate=per_agent_rate,
+            per_agent_capacity=1,
+        )
+        mw = RateLimitMiddleware(limiter)
+        req = SimpleRequest(headers={HEADER_AGENT_DID: "did:mesh:agent1"})
+        mw.handle(req, _ok_handler)
+        resp = mw.handle(req, _ok_handler)
+        assert resp.status_code == 429
+        header = resp.headers[HEADER_RETRY_AFTER]
+        assert header.isdigit(), header
+        assert int(header) >= 1
+        # Rounded up, so a client never retries before the bucket refills.
+        assert int(header) >= resp.body["retry_after"]
+
     def test_backpressure_header(self) -> None:
         limiter = RateLimiter(
             global_rate=1000,

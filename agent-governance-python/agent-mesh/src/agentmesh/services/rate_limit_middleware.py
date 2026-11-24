@@ -107,7 +107,9 @@ class RateLimitMiddleware:
                 status_code=429,
                 body={"error": "Too Many Requests", "retry_after": retry_after},
             )
-            resp.headers[HEADER_RETRY_AFTER] = str(round(retry_after, 2))
+            # RFC 9110 allows only whole seconds here; round up so clients
+            # never retry before the bucket has refilled.
+            resp.headers[HEADER_RETRY_AFTER] = str(max(1, math.ceil(retry_after)))
             self._add_rate_limit_headers(
                 resp,
                 remaining=result.remaining_tokens,
